@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons"
 import { useAuth } from "@/context/AuthContext"
 import Avatar from "@/components/Avatar"
 import SessionSplash from "@/components/SessionSplash"
+import { useWakeState } from "@/api/wake"
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"]
 
@@ -29,8 +30,12 @@ export default function MainLayout() {
   const pathname = usePathname()
   const { width } = useWindowDimensions()
   const compact = width < 720
+  const wake = useWakeState()
 
   if (isLoading) return <SessionSplash />
+  if (wake === "waking") {
+    return <SessionSplash message="Estamos despertando el servidor. La primera vez puede tardar hasta un minuto." />
+  }
   if (!isLoggedIn || !user) return <Redirect href="/(auth)/login" />
 
   return (

@@ -11,6 +11,7 @@ import {
 import { Redirect, useRouter } from "expo-router"
 import { useAuth } from "@/context/AuthContext"
 import { login } from "@/api/auth"
+import { useWakeState, wakeBackends } from "@/api/wake"
 import { friendlyError } from "@/api/client"
 import AuthBrand from "@/components/AuthBrand"
 import AuthField from "@/components/AuthField"
@@ -18,6 +19,7 @@ import PressableScale from "@/components/PressableScale"
 
 export default function LoginScreen() {
   const { setUser, isLoggedIn } = useAuth()
+  const wake = useWakeState()
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -30,6 +32,7 @@ export default function LoginScreen() {
     setLoading(true)
     setError("")
     try {
+      await wakeBackends()
       const user = await login(email.trim(), password)
       setUser(user)
       router.replace("/(main)/users")
@@ -65,6 +68,31 @@ export default function LoginScreen() {
             title="Backoffice"
             subtitle="Acceso exclusivo para el staff de la plataforma."
           />
+
+          {wake === "waking" || wake === "failed" ? (
+            <View
+              accessibilityRole={wake === "failed" ? "alert" : undefined}
+              accessibilityLiveRegion="polite"
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 9,
+                padding: 10,
+                borderRadius: 12,
+                marginBottom: 12,
+                backgroundColor: "rgba(55,214,192,0.08)",
+                borderWidth: 1,
+                borderColor: "rgba(55,214,192,0.30)",
+              }}
+            >
+              {wake === "waking" ? <ActivityIndicator size="small" color="#37D6C0" /> : null}
+              <Text style={{ color: "#BFE6E1", fontSize: 12, flex: 1, lineHeight: 17 }}>
+                {wake === "waking"
+                  ? "Estamos despertando el servidor. La primera vez puede tardar hasta un minuto; podés ir completando tus datos."
+                  : "No pudimos conectar con el servidor. Revisá tu conexión y probá de nuevo."}
+              </Text>
+            </View>
+          ) : null}
 
           {error ? (
             <View
@@ -133,7 +161,9 @@ export default function LoginScreen() {
             {loading ? (
               <>
                 <ActivityIndicator size="small" color="#8DA8AC" />
-                <Text style={{ color: "#8DA8AC", fontWeight: "700", fontSize: 14 }}>Ingresando...</Text>
+                <Text style={{ color: "#8DA8AC", fontWeight: "700", fontSize: 14 }}>
+                  {wake === "waking" ? "Esperando al servidor..." : "Ingresando..."}
+                </Text>
               </>
             ) : (
               <Text
