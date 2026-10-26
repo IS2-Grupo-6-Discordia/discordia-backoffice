@@ -42,9 +42,20 @@ npx expo start --web --port 8091
 
 ## Deploy
 
-Igual que el cliente web: proyecto aparte en Vercel con `EXPO_PUBLIC_API_URL` apuntando al
-gateway de producción (`vercel.json` ya redirige todas las rutas a `index.html`). El dominio del
-backoffice tiene que agregarse a `CORS_ALLOWED_ORIGIN_*` del gateway en Render.
+Cloudflare Pages conectado al repo (rama `main`):
+
+- Build command: `npm run build:web`
+- Build output directory: `dist`
+- Variables: `EXPO_PUBLIC_API_URL` apuntando al gateway de producción y `NODE_VERSION=22`.
+
+`build:web` corre `expo export` y después `scripts/fix-dist-assets.mjs`, que mueve
+`dist/assets/node_modules` a `dist/assets/vendor` y corrige las rutas en el bundle. Hace falta
+porque Cloudflare Pages no sube nada que esté dentro de una carpeta `node_modules`, y ahí deja Expo
+las fuentes de los íconos: sin ese paso, los íconos se ven como cuadrados vacíos.
+
+Pages ya sirve `index.html` para cualquier ruta que no exista, así que no hace falta configurar
+redirecciones. El dominio del backoffice tiene que agregarse a `CORS_ALLOWED_ORIGIN_*` del gateway
+en Render.
 
 ## Servicios dormidos en Render
 
