@@ -7,6 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "build:web": "expo export --platform web && node scripts/fix-dist-assets.mjs",
     "warmup": "node scripts/warmup.mjs",
     "preweb": "node scripts/warmup.mjs"
   },
