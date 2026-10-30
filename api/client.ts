@@ -1,5 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage"
 
+import { newTraceHeaders } from "@/api/trace"
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? ""
 
 let token: string | null = null
@@ -33,11 +35,13 @@ export async function setRefreshToken(t: string | null) {
 export class ApiError extends Error {
   status: number
   detail: unknown
+  requestId?: string
 
-  constructor(status: number, detail: unknown, message: string) {
+  constructor(status: number, detail: unknown, message: string, requestId?: string) {
     super(message)
     this.status = status
     this.detail = detail
+    this.requestId = requestId
   }
 }
 
@@ -68,6 +72,15 @@ function genericForStatus(status: number): string {
   return "Ocurrió un error. Probá de nuevo."
 }
 
+// Short code the user can pass on to support: the start of the request id, enough
+// to find the request in the logs. It only goes on errors with no specific cause
+// to show; the rest already tell the user what to do.
+function withSupportCode(message: string, err: ApiError): string {
+  const unexplained = err.status >= 500 || !(err.status in GENERIC_ERROR_BY_STATUS)
+  if (!unexplained || !err.requestId) return message
+  return `${message} (Código: ${err.requestId.slice(0, 8)})`
+}
+
 // Heuristic guard: raw FastAPI/pydantic validation fragments (English) must
 // never reach the user, even on the rare chance one arrives as a string detail.
 function looksTechnical(msg: string): boolean {
@@ -93,7 +106,7 @@ export function friendlyError(err: unknown): string {
         return detail
       }
     }
-    return genericForStatus(err.status)
+    return withSupportCode(genericForStatus(err.status), err)
   }
 
   // Network failures throw a TypeError; timeouts (AbortController) an AbortError.
@@ -130,7 +143,7 @@ async function renewSession(staleToken: string): Promise<boolean> {
   try {
     res = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...newTraceHeaders() },
       body: JSON.stringify({ refresh_token: refreshToken }),
     })
   } catch {
@@ -154,9 +167,11 @@ function refreshSession(staleToken: string): Promise<boolean> {
   return refreshing
 }
 
-async function authorizedFetch(path: string, init: RequestInit): Promise<Response> {
+async function authorizedFetch(path: string, init: RequestInit): Promise<{ res: Response; requestId: string }> {
+  // Outside send(): the retry after a refresh is the same request, with the same id.
+  const traceHeaders = newTraceHeaders()
   const send = () => {
-    const headers: Record<string, string> = { ...(init.headers as Record<string, string>) }
+    const headers: Record<string, string> = { ...(init.headers as Record<string, string>), ...traceHeaders }
     if (token) headers["Authorization"] = `Bearer ${token}`
     return fetch(`${API_BASE}${path}`, { ...init, headers })
   }
@@ -173,7 +188,7 @@ async function authorizedFetch(path: string, init: RequestInit): Promise<Respons
     await setRefreshToken(null)
   }
 
-  return res
+  return { res, requestId: traceHeaders["X-Request-Id"] }
 }
 
 export async function api<T>(
@@ -185,7 +200,7 @@ export async function api<T>(
     ...(options.headers as Record<string, string>),
   }
 
-  const res = await authorizedFetch(path, { ...options, headers })
+  const { res, requestId } = await authorizedFetch(path, { ...options, headers })
 
   if (!res.ok) {
     const text = await res.text().catch(() => "")
@@ -195,7 +210,7 @@ export async function api<T>(
     } catch {
       detail = text || "Error desconocido"
     }
-    throw new ApiError(res.status, detail, extractDetailMessage(detail, "Error desconocido"))
+    throw new ApiError(res.status, detail, extractDetailMessage(detail, "Error desconocido"), res.headers.get("X-Request-Id") ?? requestId)
   }
 
   if (res.status === 204) {
@@ -212,7 +227,7 @@ export async function apiUpload<T>(
   path: string,
   formData: FormData,
 ): Promise<T> {
-  const res = await authorizedFetch(path, { method: "POST", body: formData, headers: {} })
+  const { res, requestId } = await authorizedFetch(path, { method: "POST", body: formData, headers: {} })
 
   if (!res.ok) {
     const text = await res.text().catch(() => "")
@@ -222,7 +237,7 @@ export async function apiUpload<T>(
     } catch {
       detail = text || "Error desconocido"
     }
-    throw new ApiError(res.status, detail, extractDetailMessage(detail, "Error desconocido"))
+    throw new ApiError(res.status, detail, extractDetailMessage(detail, "Error desconocido"), res.headers.get("X-Request-Id") ?? requestId)
   }
 
   if (res.status === 204) {
