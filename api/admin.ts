@@ -18,6 +18,8 @@ interface BackendAdminServer {
   owner_id: string
   member_count: number
   created_at: string
+  suspended: boolean
+  suspended_at: string | null
 }
 
 function toAdminUser(user: BackendAdminUser): AdminUser {
@@ -40,6 +42,8 @@ function toAdminServer(server: BackendAdminServer): AdminServer {
     ownerId: server.owner_id,
     memberCount: server.member_count,
     createdAt: server.created_at,
+    suspended: server.suspended,
+    suspendedAt: server.suspended_at,
   }
 }
 
@@ -77,4 +81,14 @@ export async function getAdminServers(search?: string): Promise<AdminServer[]> {
   const qs = search ? `?search=${encodeURIComponent(search)}` : ""
   const res = await api<BackendAdminServer[]>(`/admin/servers${qs}`)
   return res.map(toAdminServer)
+}
+
+export async function suspendServer(serverId: string): Promise<AdminServer> {
+  const res = await api<BackendAdminServer>(`/admin/servers/${serverId}/suspend`, { method: "POST" })
+  return toAdminServer(res)
+}
+
+export async function reactivateServer(serverId: string): Promise<AdminServer> {
+  const res = await api<BackendAdminServer>(`/admin/servers/${serverId}/reactivate`, { method: "POST" })
+  return toAdminServer(res)
 }
