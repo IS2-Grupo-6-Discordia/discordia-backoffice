@@ -30,4 +30,6 @@ export interface AdminServer {
   ownerId: string
   memberCount: number
   createdAt: string
+  suspended: boolean
+  suspendedAt: string | null
 }
