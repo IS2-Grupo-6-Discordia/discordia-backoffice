@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, Image, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import { useRouter } from "expo-router"
 import { deleteServer, getAdminServers, reactivateServer, suspendServer } from "@/api/admin"
 import { ApiError, friendlyError } from "@/api/client"
 import type { AdminServer } from "@/api/types"
@@ -37,6 +38,7 @@ function abbr(name: string): string {
 
 export default function ServersScreen() {
   const { logout } = useAuth()
+  const router = useRouter()
   const [servers, setServers] = useState<AdminServer[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
@@ -118,37 +120,44 @@ export default function ServersScreen() {
         borderBottomColor: "rgba(255,255,255,0.08)",
       }}
     >
-      {item.iconUrl ? (
-        <Image source={{ uri: item.iconUrl }} style={{ width: 40, height: 40, borderRadius: 12, marginRight: 12 }} />
-      ) : (
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: "rgba(55,214,192,0.15)",
-            alignItems: "center",
-            justifyContent: "center",
-            marginRight: 12,
-          }}
-        >
-          <Text style={{ color: "#37D6C0", fontWeight: "800", fontSize: 14 }}>{abbr(item.name)}</Text>
-        </View>
-      )}
+      <Pressable
+        onPress={() => router.push(`/(main)/expediente/servidor/${item.id}`)}
+        accessibilityRole="link"
+        accessibilityLabel={`Ver expediente de ${item.name}`}
+        style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center" }}
+      >
+        {item.iconUrl ? (
+          <Image source={{ uri: item.iconUrl }} style={{ width: 40, height: 40, borderRadius: 12, marginRight: 12 }} />
+        ) : (
+          <View
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 12,
+              backgroundColor: "rgba(55,214,192,0.15)",
+              alignItems: "center",
+              justifyContent: "center",
+              marginRight: 12,
+            }}
+          >
+            <Text style={{ color: "#37D6C0", fontWeight: "800", fontSize: 14 }}>{abbr(item.name)}</Text>
+          </View>
+        )}
 
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ color: "#E6F3F3", fontWeight: "700", fontSize: 14 }} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text
-          style={{ color: item.suspended && compact ? "#FF7F72" : "#8DA8AC", fontSize: 12, marginTop: 2 }}
-          numberOfLines={1}
-        >
-          {item.suspended && item.suspendedAt
-            ? `Suspendido el ${formatDate(item.suspendedAt)}`
-            : `Creado el ${formatDate(item.createdAt)}`}
-        </Text>
-      </View>
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ color: "#E6F3F3", fontWeight: "700", fontSize: 14 }} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <Text
+            style={{ color: item.suspended && compact ? "#FF7F72" : "#8DA8AC", fontSize: 12, marginTop: 2 }}
+            numberOfLines={1}
+          >
+            {item.suspended && item.suspendedAt
+              ? `Suspendido el ${formatDate(item.suspendedAt)}`
+              : `Creado el ${formatDate(item.createdAt)}`}
+          </Text>
+        </View>
+      </Pressable>
 
       {compact ? null : (
         <View style={{ marginRight: 12 }}>
