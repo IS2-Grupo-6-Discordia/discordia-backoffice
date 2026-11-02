@@ -1,6 +1,7 @@
 import type { ComponentProps, ReactNode } from "react"
 import { ActivityIndicator, Platform, Pressable, Text, TextInput, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import type { ViewStyle } from "react-native"
 import ModalShell from "@/components/ModalShell"
 import PressableScale from "@/components/PressableScale"
 import Tag from "@/components/Tag"
@@ -159,13 +160,36 @@ export function ListRow({
   )
 }
 
+export function MessageQuote({ content, style }: { content: string; style?: ViewStyle }) {
+  return (
+    <View
+      style={[
+        {
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          borderRadius: 8,
+          borderLeftWidth: 3,
+          borderLeftColor: "#FF7F72",
+          backgroundColor: "rgba(255,255,255,0.04)",
+        },
+        style,
+      ]}
+    >
+      <Text style={{ color: "#E6F3F3", fontSize: 13 }} numberOfLines={6}>
+        {content}
+      </Text>
+      <Text style={{ color: "#5E7E82", fontSize: 10.5, marginTop: 3 }}>Copia del mensaje al momento del reporte</Text>
+    </View>
+  )
+}
+
 export function ReportStatusTag({ status }: { status: Report["status"] }) {
   return <Tag type={status === "pending" ? "warn" : status === "reviewed" ? "ok" : "sus"}>{REPORT_STATUS_LABELS[status]}</Tag>
 }
 
 export function ReportRow({ report, names }: { report: Report; names: Map<string, string> }) {
   const reporter = names.get(report.reporterId) ?? "Usuario"
-  const where = report.targetType === "user" ? ` · en ${report.serverName}` : ""
+  const where = report.targetType === "user" ? ` · en ${report.serverName}` : report.targetType === "message" ? ` · mensaje en ${report.serverName}` : ""
   return (
     <View
       style={{
@@ -191,6 +215,7 @@ export function ReportRow({ report, names }: { report: Report; names: Map<string
         Reportado por {reporter}
         {where} · {formatDateTime(report.createdAt)}
       </Text>
+      {report.messageContent ? <MessageQuote content={report.messageContent} style={{ marginTop: 6 }} /> : null}
       {report.detail ? <Text style={{ color: "#C9DADB", fontSize: 12.5, marginTop: 4 }}>“{report.detail}”</Text> : null}
     </View>
   )

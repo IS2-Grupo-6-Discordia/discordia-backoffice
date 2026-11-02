@@ -6,7 +6,7 @@ import { ApiError, friendlyError } from "@/api/client"
 import { REPORT_REASON_LABELS, getReports, getUserNames, resolveReport, type Report, type ReportStatusFilter } from "@/api/dossier"
 import { useAuth } from "@/context/AuthContext"
 import PressableScale from "@/components/PressableScale"
-import { ReportStatusTag, formatDateTime } from "@/components/dossier/DossierParts"
+import { MessageQuote, ReportStatusTag, formatDateTime } from "@/components/dossier/DossierParts"
 
 const FILTERS: { value: ReportStatusFilter; label: string }[] = [
   { value: "pending", label: "Pendientes" },
@@ -69,12 +69,12 @@ export default function ReportsScreen() {
   }
 
   const openTarget = (report: Report) => {
-    if (report.targetType === "user" && report.targetUserId) router.push(`/(main)/expediente/usuario/${report.targetUserId}`)
+    if (report.targetType !== "server" && report.targetUserId) router.push(`/(main)/expediente/usuario/${report.targetUserId}`)
     else router.push(`/(main)/expediente/servidor/${report.serverId}`)
   }
 
   const renderItem = ({ item }: { item: Report }) => {
-    const target = item.targetType === "user" ? (names.get(item.targetUserId ?? "") ?? "Usuario") : item.serverName
+    const target = item.targetType !== "server" ? (names.get(item.targetUserId ?? "") ?? "Usuario") : item.serverName
     return (
       <View
         style={{
@@ -92,13 +92,14 @@ export default function ReportsScreen() {
               borderRadius: 10,
               alignItems: "center",
               justifyContent: "center",
-              backgroundColor: item.targetType === "user" ? "rgba(160,147,255,0.15)" : "rgba(55,214,192,0.15)",
+              backgroundColor:
+                item.targetType === "user" ? "rgba(160,147,255,0.15)" : item.targetType === "message" ? "rgba(255,127,114,0.15)" : "rgba(55,214,192,0.15)",
             }}
           >
             <Ionicons
-              name={item.targetType === "user" ? "person-outline" : "server-outline"}
+              name={item.targetType === "user" ? "person-outline" : item.targetType === "message" ? "chatbox-ellipses-outline" : "server-outline"}
               size={16}
-              color={item.targetType === "user" ? "#A093FF" : "#37D6C0"}
+              color={item.targetType === "user" ? "#A093FF" : item.targetType === "message" ? "#FF7F72" : "#37D6C0"}
             />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -106,12 +107,13 @@ export default function ReportsScreen() {
               {REPORT_REASON_LABELS[item.reason] ?? item.reason} · {target}
             </Text>
             <Text style={{ color: "#8DA8AC", fontSize: 12, marginTop: 1 }} numberOfLines={1}>
-              {item.targetType === "user" ? `Usuario en ${item.serverName}` : "Servidor"} · por {names.get(item.reporterId) ?? "Usuario"} ·{" "}
+              {item.targetType === "user" ? `Usuario en ${item.serverName}` : item.targetType === "message" ? `Mensaje en ${item.serverName}` : "Servidor"} · por {names.get(item.reporterId) ?? "Usuario"} ·{" "}
               {formatDateTime(item.createdAt)}
             </Text>
           </View>
           <ReportStatusTag status={item.status} />
         </View>
+        {item.messageContent ? <MessageQuote content={item.messageContent} style={{ marginTop: 8, marginLeft: 44 }} /> : null}
         {item.detail ? (
           <Text
             style={{

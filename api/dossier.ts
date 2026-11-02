@@ -21,8 +21,9 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
 export interface Report {
   id: string
   reporterId: string
-  targetType: "user" | "server"
+  targetType: "user" | "server" | "message"
   targetUserId: string | null
+  messageContent: string | null
   serverId: string
   serverName: string
   reason: string
@@ -92,8 +93,9 @@ export interface ServerDossier {
 interface BackendReport {
   id: string
   reporter_id: string
-  target_type: "user" | "server"
+  target_type: "user" | "server" | "message"
   target_user_id: string | null
+  message_content?: string | null
   server_id: string
   server_name: string
   reason: string
@@ -119,6 +121,7 @@ function toReport(r: BackendReport): Report {
     reporterId: r.reporter_id,
     targetType: r.target_type,
     targetUserId: r.target_user_id,
+    messageContent: r.message_content ?? null,
     serverId: r.server_id,
     serverName: r.server_name,
     reason: r.reason,
