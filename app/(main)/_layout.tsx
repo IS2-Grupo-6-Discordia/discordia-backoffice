@@ -8,9 +8,16 @@ import { useWakeState } from "@/api/wake"
 
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"]
 
-const NAV_ITEMS: { href: "/(main)/users" | "/(main)/servers"; path: string; label: string; icon: IoniconName }[] = [
-  { href: "/(main)/users", path: "/users", label: "Usuarios", icon: "people-outline" },
-  { href: "/(main)/servers", path: "/servers", label: "Servidores", icon: "server-outline" },
+const NAV_ITEMS: {
+  href: "/(main)/users" | "/(main)/servers" | "/(main)/reports"
+  path: string
+  dossierPath?: string
+  label: string
+  icon: IoniconName
+}[] = [
+  { href: "/(main)/users", path: "/users", dossierPath: "/expediente/usuario", label: "Usuarios", icon: "people-outline" },
+  { href: "/(main)/servers", path: "/servers", dossierPath: "/expediente/servidor", label: "Servidores", icon: "server-outline" },
+  { href: "/(main)/reports", path: "/reports", label: "Reportes", icon: "flag-outline" },
 ]
 
 function initialsFor(name: string): string {
@@ -91,7 +98,7 @@ export default function MainLayout() {
           style={compact ? ({ order: 3, width: "100%", flexBasis: "100%" } as object) : { flexGrow: 1 }}
         >
           {NAV_ITEMS.map((item) => {
-            const active = pathname.startsWith(item.path)
+            const active = pathname.startsWith(item.path) || (!!item.dossierPath && pathname.startsWith(item.dossierPath))
             return (
               <Pressable
                 key={item.path}

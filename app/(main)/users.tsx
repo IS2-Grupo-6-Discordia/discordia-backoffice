@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
 } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
+import { useRouter } from "expo-router"
 import { getUsers, reactivateUser, suspendUser } from "@/api/admin"
 import { ApiError, friendlyError } from "@/api/client"
 import type { AccountStatusFilter, AdminUser } from "@/api/types"
@@ -46,6 +47,7 @@ function formatDate(iso: string): string {
 
 export default function UsersScreen() {
   const { user: me, logout } = useAuth()
+  const router = useRouter()
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<AccountStatusFilter>("all")
   const [users, setUsers] = useState<AdminUser[]>([])
@@ -138,21 +140,28 @@ export default function UsersScreen() {
           opacity: item.isActive ? 1 : 0.85,
         }}
       >
-        <Avatar initials={initialsFor(item.name)} size={34} uri={item.avatarUrl} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Text style={{ color: "#E6F3F3", fontWeight: "700", fontSize: 14, flexShrink: 1 }} numberOfLines={1}>
-              {item.name}
+        <Pressable
+          onPress={() => router.push(`/(main)/expediente/usuario/${item.id}`)}
+          accessibilityRole="link"
+          accessibilityLabel={`Ver expediente de ${item.name}`}
+          style={{ flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 12 }}
+        >
+          <Avatar initials={initialsFor(item.name)} size={34} uri={item.avatarUrl} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              <Text style={{ color: "#E6F3F3", fontWeight: "700", fontSize: 14, flexShrink: 1 }} numberOfLines={1}>
+                {item.name}
+              </Text>
+              {item.role === "staff" ? (
+                <Text style={{ color: "#37D6C0", fontSize: 10.5, fontWeight: "800" }}>STAFF</Text>
+              ) : null}
+              {isMe ? <Text style={{ color: "#8DA8AC", fontSize: 11 }}>(vos)</Text> : null}
+            </View>
+            <Text style={{ color: "#8DA8AC", fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+              {compact ? item.email : `${item.email} · Alta ${formatDate(item.createdAt)}`}
             </Text>
-            {item.role === "staff" ? (
-              <Text style={{ color: "#37D6C0", fontSize: 10.5, fontWeight: "800" }}>STAFF</Text>
-            ) : null}
-            {isMe ? <Text style={{ color: "#8DA8AC", fontSize: 11 }}>(vos)</Text> : null}
           </View>
-          <Text style={{ color: "#8DA8AC", fontSize: 12, marginTop: 2 }} numberOfLines={1}>
-            {compact ? item.email : `${item.email} · Alta ${formatDate(item.createdAt)}`}
-          </Text>
-        </View>
+        </Pressable>
 
         <Tag type={item.isActive ? "ok" : "sus"}>{item.isActive ? "Activo" : "Suspendido"}</Tag>
 
