@@ -18,6 +18,54 @@ interface LoginApiResponse {
   refresh_token: string
 }
 
+interface TwoFactorChallengeApiResponse {
+  two_factor_required: true
+  challenge_token: string
+}
+
+export class TwoFactorRequired extends Error {
+  challengeToken: string
+
+  constructor(challengeToken: string) {
+    super("two_factor_required")
+    this.challengeToken = challengeToken
+  }
+}
+
+async function openStaffSession(res: LoginApiResponse): Promise<StaffUser> {
+  await setToken(res.access_token)
+  await setRefreshToken(res.refresh_token)
+  const user = toStaffUser(res.user)
+  if (user.role !== STAFF_ROLE) {
+    await logout()
+    throw new ApiError(403, NOT_STAFF_MESSAGE, NOT_STAFF_MESSAGE)
+  }
+  return user
+}
+
+export async function completeTwoFactorLogin(
+  challengeToken: string,
+  secondFactor: { code: string } | { recoveryCode: string },
+): Promise<{ user: StaffUser; recoveryCodeUsed: boolean; recoveryCodesRemaining: number }> {
+  const res = await api<
+    LoginApiResponse & { recovery_code_used: boolean; recovery_codes_remaining: number }
+  >("/auth/login/2fa", {
+    method: "POST",
+    body: JSON.stringify({
+      challenge_token: challengeToken,
+      ...("code" in secondFactor
+        ? { code: secondFactor.code }
+        : { recovery_code: secondFactor.recoveryCode }),
+    }),
+  })
+  const user = await openStaffSession(res)
+  return {
+    user,
+    recoveryCodeUsed: res.recovery_code_used,
+    recoveryCodesRemaining: res.recovery_codes_remaining,
+  }
+}
+
 function toStaffUser(user: BackendUser): StaffUser {
   return {
     id: user.id,
@@ -41,19 +89,12 @@ export async function logout(): Promise<void> {
 }
 
 export async function login(email: string, password: string): Promise<StaffUser> {
-  const res = await api<LoginApiResponse>("/auth/login", {
+  const res = await api<LoginApiResponse | TwoFactorChallengeApiResponse>("/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
   })
-  await setToken(res.access_token)
-  await setRefreshToken(res.refresh_token)
-
-  const user = toStaffUser(res.user)
-  if (user.role !== STAFF_ROLE) {
-    await logout()
-    throw new ApiError(403, NOT_STAFF_MESSAGE, NOT_STAFF_MESSAGE)
-  }
-  return user
+  if ("two_factor_required" in res) throw new TwoFactorRequired(res.challenge_token)
+  return openStaffSession(res)
 }
 
 export async function requestRecovery(email: string): Promise<void> {

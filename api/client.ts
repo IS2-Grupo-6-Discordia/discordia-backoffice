@@ -106,6 +106,7 @@ export function friendlyError(err: unknown): string {
 
 const NO_REFRESH_PATHS = new Set([
   "/auth/login",
+  "/auth/login/2fa",
   "/auth/oauth/google",
   "/auth/refresh",
   "/auth/logout",
