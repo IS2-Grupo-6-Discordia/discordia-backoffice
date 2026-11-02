@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ActivityIndicator, FlatList, Image, Platform, Pressable, Text, TextInput, View, useWindowDimensions } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
-import { getAdminServers, reactivateServer, suspendServer } from "@/api/admin"
+import { deleteServer, getAdminServers, reactivateServer, suspendServer } from "@/api/admin"
 import { ApiError, friendlyError } from "@/api/client"
 import type { AdminServer } from "@/api/types"
 import { useAuth } from "@/context/AuthContext"
@@ -9,7 +9,19 @@ import ModalShell from "@/components/ModalShell"
 import PressableScale from "@/components/PressableScale"
 import Tag from "@/components/Tag"
 
-type PendingAction = { kind: "suspend" | "reactivate"; server: AdminServer }
+type PendingAction = { kind: "suspend" | "reactivate" | "delete"; server: AdminServer }
+
+const MODAL_TITLES: Record<PendingAction["kind"], string> = {
+  suspend: "Suspender servidor",
+  reactivate: "Levantar suspensión",
+  delete: "Eliminar servidor",
+}
+
+const CONFIRM_LABELS: Record<PendingAction["kind"], string> = {
+  suspend: "Suspender",
+  reactivate: "Levantar suspensión",
+  delete: "Eliminar para siempre",
+}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric" })
@@ -33,6 +45,7 @@ export default function ServersScreen() {
   const [pending, setPending] = useState<PendingAction | null>(null)
   const [acting, setActing] = useState(false)
   const [actionError, setActionError] = useState("")
+  const [confirmName, setConfirmName] = useState("")
   const compact = useWindowDimensions().width < 600
 
   const fetchServers = useCallback(
@@ -61,16 +74,25 @@ export default function ServersScreen() {
 
   const confirmAction = async () => {
     if (!pending) return
+    if (pending.kind === "delete" && !nameMatches) return
     setActing(true)
     setActionError("")
     try {
-      const updated =
-        pending.kind === "suspend" ? await suspendServer(pending.server.id) : await reactivateServer(pending.server.id)
-      setServers((current) => current.map((s) => (s.id === updated.id ? updated : s)))
+      if (pending.kind === "delete") {
+        await deleteServer(pending.server.id, confirmName.trim())
+        setServers((current) => current.filter((s) => s.id !== pending.server.id))
+      } else {
+        const updated =
+          pending.kind === "suspend" ? await suspendServer(pending.server.id) : await reactivateServer(pending.server.id)
+        setServers((current) => current.map((s) => (s.id === updated.id ? updated : s)))
+      }
       setPending(null)
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) logout()
-      else setActionError(friendlyError(err))
+      else if (pending.kind === "delete" && err instanceof ApiError && err.status === 404) {
+        setServers((current) => current.filter((s) => s.id !== pending.server.id))
+        setPending(null)
+      } else setActionError(friendlyError(err))
     } finally {
       setActing(false)
     }
@@ -78,8 +100,12 @@ export default function ServersScreen() {
 
   const openAction = (kind: PendingAction["kind"], server: AdminServer) => {
     setActionError("")
+    setConfirmName("")
     setPending({ kind, server })
   }
+
+  const nameMatches = !!pending && confirmName.trim() === pending.server.name
+  const confirmDisabled = acting || (pending?.kind === "delete" && !nameMatches)
 
   const renderItem = ({ item }: { item: AdminServer }) => (
     <View
@@ -141,7 +167,16 @@ export default function ServersScreen() {
         )}
       </View>
 
-      <View style={{ width: compact ? 96 : 150, alignItems: "flex-end", marginLeft: compact ? 8 : 12 }}>
+      <View
+        style={{
+          width: compact ? 132 : 190,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginLeft: compact ? 8 : 12,
+        }}
+      >
         {item.suspended ? (
           <PressableScale
             onPress={() => openAction("reactivate", item)}
@@ -160,6 +195,21 @@ export default function ServersScreen() {
             <Text style={{ color: "#FF7F72", fontWeight: "700", fontSize: 12 }}>Suspender</Text>
           </PressableScale>
         )}
+        <PressableScale
+          onPress={() => openAction("delete", item)}
+          accessibilityLabel={`Eliminar ${item.name}`}
+          hoverStyle={{ backgroundColor: "rgba(255,127,114,0.12)" }}
+          style={{
+            width: 30,
+            height: 30,
+            borderRadius: 9999,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "rgba(255,127,114,0.08)",
+          }}
+        >
+          <Ionicons name="trash-outline" size={15} color="#FF7F72" />
+        </PressableScale>
       </View>
     </View>
   )
@@ -169,7 +219,7 @@ export default function ServersScreen() {
       <View style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 }}>
         <Text style={{ color: "#E6F3F3", fontSize: 20, fontWeight: "800" }}>Servidores</Text>
         <Text style={{ color: "#8DA8AC", fontSize: 13, marginTop: 2 }}>
-          Todos los servidores de la plataforma. Suspendé uno para bloquearlo mientras investigás una denuncia.
+          Todos los servidores de la plataforma. Suspendé uno para bloquearlo mientras investigás una denuncia, o eliminalo si incumple los términos.
         </Text>
       </View>
 
@@ -240,14 +290,45 @@ export default function ServersScreen() {
       <ModalShell
         visible={!!pending}
         onClose={() => (acting ? undefined : setPending(null))}
-        title={pending?.kind === "suspend" ? "Suspender servidor" : "Levantar suspensión"}
+        title={pending ? MODAL_TITLES[pending.kind] : ""}
         subtitle={pending ? `${pending.server.name} · ${pending.server.memberCount} ${pending.server.memberCount === 1 ? "miembro" : "miembros"}` : undefined}
       >
         <Text style={{ color: "#C9DADB", fontSize: 13.5, lineHeight: 20 }}>
-          {pending?.kind === "suspend"
-            ? "Ningún miembro va a poder entrar al servidor ni a sus llamadas mientras dure la suspensión. No se borra nada: canales, roles, miembros y mensajes se conservan."
-            : "Los miembros recuperan el acceso normal al servidor, con todo su contenido como estaba."}
+          {pending?.kind === "delete"
+            ? "Se eliminan para siempre el servidor y todos sus canales, mensajes, roles, miembros e invitaciones, y se cortan sus llamadas en curso. No se puede deshacer."
+            : pending?.kind === "suspend"
+              ? "Ningún miembro va a poder entrar al servidor ni a sus llamadas mientras dure la suspensión. No se borra nada: canales, roles, miembros y mensajes se conservan."
+              : "Los miembros recuperan el acceso normal al servidor, con todo su contenido como estaba."}
         </Text>
+        {pending?.kind === "delete" ? (
+          <View style={{ marginTop: 14 }}>
+            <Text style={{ color: "#8DA8AC", fontSize: 12.5, marginBottom: 6 }}>
+              Para confirmar, escribí el nombre del servidor: <Text style={{ color: "#E6F3F3", fontWeight: "700" }}>{pending.server.name}</Text>
+            </Text>
+            <TextInput
+              value={confirmName}
+              onChangeText={setConfirmName}
+              placeholder={pending.server.name}
+              placeholderTextColor="#5A7A80"
+              autoCapitalize="none"
+              autoCorrect={false}
+              editable={!acting}
+              accessibilityLabel="Nombre del servidor para confirmar"
+              onSubmitEditing={confirmAction}
+              style={{
+                color: "#E6F3F3",
+                fontSize: 14,
+                height: 40,
+                paddingHorizontal: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: nameMatches ? "#FF7F72" : "rgba(255,255,255,0.13)",
+                backgroundColor: "rgba(255,255,255,0.06)",
+                ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as object) : {}),
+              }}
+            />
+          </View>
+        ) : null}
         {actionError ? (
           <Text accessibilityRole="alert" style={{ color: "#FF7F72", fontSize: 12.5, marginTop: 10 }}>
             {actionError}
@@ -263,7 +344,7 @@ export default function ServersScreen() {
           </Pressable>
           <PressableScale
             onPress={confirmAction}
-            disabled={acting}
+            disabled={confirmDisabled}
             style={{
               flexDirection: "row",
               alignItems: "center",
@@ -271,13 +352,13 @@ export default function ServersScreen() {
               paddingHorizontal: 14,
               paddingVertical: 9,
               borderRadius: 10,
-              backgroundColor: pending?.kind === "suspend" ? "#FF7F72" : "#37D6C0",
-              opacity: acting ? 0.7 : 1,
+              backgroundColor: pending?.kind === "reactivate" ? "#37D6C0" : "#FF7F72",
+              opacity: confirmDisabled ? 0.45 : 1,
             }}
           >
             {acting ? <ActivityIndicator size="small" color="#04211D" /> : null}
             <Text style={{ color: "#04211D", fontWeight: "800", fontSize: 13 }}>
-              {pending?.kind === "suspend" ? "Suspender" : "Levantar suspensión"}
+              {pending ? CONFIRM_LABELS[pending.kind] : ""}
             </Text>
           </PressableScale>
         </View>

@@ -92,3 +92,10 @@ export async function reactivateServer(serverId: string): Promise<AdminServer> {
   const res = await api<BackendAdminServer>(`/admin/servers/${serverId}/reactivate`, { method: "POST" })
   return toAdminServer(res)
 }
+
+export async function deleteServer(serverId: string, confirmationName: string): Promise<void> {
+  await api<void>(`/admin/servers/${serverId}`, {
+    method: "DELETE",
+    body: JSON.stringify({ confirmation_name: confirmationName }),
+  })
+}
