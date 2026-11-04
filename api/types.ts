@@ -33,3 +33,14 @@ export interface AdminServer {
   suspended: boolean
   suspendedAt: string | null
 }
+
+export type MetricKey = "activeUsers" | "serversCreated" | "messagesSent"
+
+// Half-open interval [from, to) in UTC, built from local day boundaries.
+// firstDay and lastDay are the calendar days shown to the staff.
+export interface MetricPeriod {
+  from: string
+  to: string
+  firstDay: string
+  lastDay: string
+}
