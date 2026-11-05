@@ -11,6 +11,7 @@ Mismo stack y sistema de diseño que `discordia-cliente-web` (Expo Router + Reac
 | Recupero | [Backoffice] Recupero de contraseña | Pide el mail de recupero. El link lleva al cliente web (`FRONTEND_BASE_URL` de autenticación). |
 | Usuarios | ADMINISTRACIÓN HU-1, HU-2, HU-5 | Búsqueda por nombre o email, filtro Todos / Activos / Suspendidos, suspender y reactivar con confirmación. |
 | Servidores | ADMINISTRACIÓN HU-3 | Listado con nombre, cantidad de miembros y fecha de creación, con búsqueda por nombre. |
+| Métricas | MÉTRICAS HU-2 | Usuarios activos, servidores creados y mensajes enviados en toda la plataforma, para un período predefinido (hoy, 7, 30 o 90 días, 12 meses) o entre dos fechas. |
 
 No hay registro: el staff no se autorregistra. Para dar acceso a alguien, primero se registra
 como usuario común en el cliente web y después se le asigna el rol desde autenticación:
@@ -24,9 +25,53 @@ docker compose exec autenticacion python -m scripts.set_role <email> staff
 - `POST /auth/login`, `POST /auth/logout`, `POST /auth/password-reset/request`
 - `GET /auth/admin/users`, `POST /auth/admin/users/{id}/suspend`, `POST /auth/admin/users/{id}/reactivate`
 - `GET /admin/servers` (microservicio de servidores)
+- `GET /auth/admin/metrics`, `GET /admin/metrics/servers`, `GET /admin/metrics/messages`
+  (autenticación, servidores y mensajes; ver [Métricas globales](#métricas-globales))
 
 Todas las rutas de admin exigen `role = staff` en el JWT, tanto en el gateway como en cada
 microservicio.
+
+## Métricas globales
+
+Cada métrica la calcula el servicio dueño del dato, y el backoffice le pide a cada uno la suya
+en paralelo. No hay un servicio que agregue: así no aparece una llamada sincrónica entre
+servicios, y si uno está caído, solo su tarjeta muestra el error y las otras se ven igual.
+
+| Métrica | Servicio | Endpoint (vía gateway) | Respuesta |
+| --- | --- | --- | --- |
+| Usuarios activos | autenticación | `GET /auth/admin/metrics?from&to` | `{"active_users": 0}` |
+| Servidores creados | servidores | `GET /admin/metrics/servers?from&to` | `{"servers_created": 0}` |
+| Mensajes enviados | mensajes | `GET /admin/metrics/messages?from&to` | `{"messages_sent": 0}` |
+
+- **Período:** `from` y `to` en ISO-8601 UTC. El intervalo es `[from, to)`. El backoffice arma
+  los cortes de día en la hora local del navegador: "7 días" va desde la medianoche de hace
+  seis días hasta ahora, y un rango de fechas incluye los dos días elegidos. Se aceptan hasta
+  366 días; el servicio responde `422` si `from >= to` o si el rango es más largo.
+- **Permisos:** las tres rutas llevan `roles: ["staff"]` en el gateway, y cada servicio vuelve
+  a chequear `X-User-Role` y `X-Internal-Secret`. Sin rol staff, la respuesta es `403`.
+- **Sin actividad:** si las tres métricas vienen en cero, la pantalla lo dice en lugar de
+  mostrar solo ceros.
+- **Si un servicio falla, solo falla su tarjeta**, con "Reintentar". Un `404` (la ruta o el servicio
+  todavía no existen) muestra "Este dato todavía no está disponible."; un `5xx`, el mensaje genérico
+  con el código del `X-Request-Id`. Si el servicio no responde, el gateway corta a los 15 segundos.
+  "Actualizar" no espera a la tarjeta lenta: solo se deshabilita mientras cargan las tres.
+
+### Pendiente: mensajes
+
+Las tres rutas ya están en el gateway, pero mensajes todavía no está deployado en Render, así que
+esa tarjeta muestra el error. Para que funcione, sin tocar el código de esta pantalla:
+
+1. **mensajes:** mergear `develop` (con `GET /api/v1/admin/metrics/messages` y `/livez`) a `main`
+   y deployarlo en Render con `MONGODB_URL` (Atlas) e `INTERNAL_SECRET`. El índice sobre
+   `created_at` se crea solo al arrancar.
+2. **gateway (Render):** `MS_MENSAJES_URL=https://microservicio-mensajes.onrender.com` e
+   `INTERNAL_SECRET_MENSAJES` igual al `INTERNAL_SECRET` de mensajes.
+3. **backoffice:** sumar `https://microservicio-mensajes.onrender.com/livez` a
+   `RENDER_DEFAULT_WAKE_URLS` en `api/wake.ts`, como ya hace el cliente web. No se agrega antes:
+   el login espera a que respondan **todas** esas URLs, y con mensajes caído cada login tardaría
+   hasta dos minutos.
+4. **Probar:** con una cuenta de staff, la tarjeta muestra un número, y `GET
+   /api/v1/admin/metrics/messages` sin token sigue respondiendo `401`.
 
 ## Desarrollo local
 
