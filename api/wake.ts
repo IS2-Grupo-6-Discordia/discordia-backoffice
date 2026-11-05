@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? ""
 const RENDER_DEFAULT_WAKE_URLS = [
-  "https://microservicio-autenticacion-z127.onrender.com/health",
+  "https://microservicio-autenticacion-z127.onrender.com/livez",
   "https://microservicio-servidores.onrender.com/readyz",
 ]
 const WAKE_TIMEOUT_MS = 120_000
