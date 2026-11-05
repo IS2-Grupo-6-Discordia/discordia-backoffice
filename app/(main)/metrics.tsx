@@ -128,7 +128,9 @@ export default function MetricsScreen() {
   }
 
   const states = METRICS.map((m) => metrics[m.key])
-  const anyLoading = states.some((s) => s.status === "loading")
+  // Only while all three load, i.e. right after a click: a slow service must not lock the other
+  // two. Restarting mid-load is safe, because each card drops answers to older requests.
+  const allLoading = states.every((s) => s.status === "loading")
   const allFailed = states.every((s) => s.status === "error")
   const noActivity = states.every((s) => s.status === "ok" && s.value === 0)
 
@@ -218,9 +220,9 @@ export default function MetricsScreen() {
         </Text>
         <Pressable
           onPress={refresh}
-          disabled={anyLoading}
+          disabled={allLoading}
           accessibilityLabel="Actualizar métricas"
-          style={{ flexDirection: "row", alignItems: "center", gap: 5, opacity: anyLoading ? 0.45 : 1 }}
+          style={{ flexDirection: "row", alignItems: "center", gap: 5, opacity: allLoading ? 0.45 : 1 }}
         >
           <Ionicons name="refresh-outline" size={15} color="#37D6C0" />
           <Text style={{ color: "#37D6C0", fontWeight: "700", fontSize: 13 }}>Actualizar</Text>

@@ -51,8 +51,27 @@ servicios, y si uno está caído, solo su tarjeta muestra el error y las otras s
   a chequear `X-User-Role` y `X-Internal-Secret`. Sin rol staff, la respuesta es `403`.
 - **Sin actividad:** si las tres métricas vienen en cero, la pantalla lo dice en lugar de
   mostrar solo ceros.
-- Mientras un servicio no tenga su ruta, el gateway responde `404` y la tarjeta muestra "Este
-  dato todavía no está disponible."
+- **Si un servicio falla, solo falla su tarjeta**, con "Reintentar". Un `404` (la ruta o el servicio
+  todavía no existen) muestra "Este dato todavía no está disponible."; un `5xx`, el mensaje genérico
+  con el código del `X-Request-Id`. Si el servicio no responde, el gateway corta a los 15 segundos.
+  "Actualizar" no espera a la tarjeta lenta: solo se deshabilita mientras cargan las tres.
+
+### Pendiente: mensajes
+
+Las tres rutas ya están en el gateway, pero mensajes todavía no está deployado en Render, así que
+esa tarjeta muestra el error. Para que funcione, sin tocar el código de esta pantalla:
+
+1. **mensajes:** mergear `develop` (con `GET /api/v1/admin/metrics/messages` y `/livez`) a `main`
+   y deployarlo en Render con `MONGODB_URL` (Atlas) e `INTERNAL_SECRET`. El índice sobre
+   `created_at` se crea solo al arrancar.
+2. **gateway (Render):** `MS_MENSAJES_URL=https://microservicio-mensajes.onrender.com` e
+   `INTERNAL_SECRET_MENSAJES` igual al `INTERNAL_SECRET` de mensajes.
+3. **backoffice:** sumar `https://microservicio-mensajes.onrender.com/livez` a
+   `RENDER_DEFAULT_WAKE_URLS` en `api/wake.ts`, como ya hace el cliente web. No se agrega antes:
+   el login espera a que respondan **todas** esas URLs, y con mensajes caído cada login tardaría
+   hasta dos minutos.
+4. **Probar:** con una cuenta de staff, la tarjeta muestra un número, y `GET
+   /api/v1/admin/metrics/messages` sin token sigue respondiendo `401`.
 
 ## Desarrollo local
 
