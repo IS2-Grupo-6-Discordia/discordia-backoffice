@@ -1,5 +1,5 @@
 import { api } from "./client"
-import type { MetricKey, MetricPeriod } from "./types"
+import type { Granularity, MetricBuckets, MetricInterval, MetricKey, MetricPeriod } from "./types"
 
 export type PeriodPreset = "today" | "7d" | "30d" | "90d" | "365d" | "custom"
 
@@ -77,7 +77,83 @@ const METRIC_REQUESTS: Record<MetricKey, (query: string) => Promise<number>> = {
   messagesSent: async (query) => (await api<{ messages_sent: number }>(`/admin/metrics/messages?${query}`)).messages_sent,
 }
 
-export function getMetric(key: MetricKey, period: MetricPeriod): Promise<number> {
+export function getMetric(key: MetricKey, period: MetricInterval): Promise<number> {
   const query = new URLSearchParams({ from: period.from, to: period.to }).toString()
   return METRIC_REQUESTS[key](query)
+}
+
+// The chart splits the period into buckets: hours for a single day, days up to a month, weeks
+// up to four months, calendar months beyond that. At most 31 buckets.
+export function periodBuckets(period: MetricPeriod): MetricBuckets {
+  const from = new Date(period.from)
+  const to = new Date(period.to)
+  const days = (to.getTime() - from.getTime()) / 86_400_000
+  const granularity: Granularity = days <= 1.05 ? "hour" : days <= 31 ? "day" : days <= 120 ? "week" : "month"
+  const starts: Date[] = []
+  for (let cursor = from; cursor < to; cursor = nextBucketStart(cursor, granularity)) starts.push(cursor)
+  return {
+    granularity,
+    buckets: starts.map((start, i) => ({
+      from: start.toISOString(),
+      to: (i + 1 < starts.length ? starts[i + 1] : to).toISOString(),
+    })),
+  }
+}
+
+function nextBucketStart(date: Date, granularity: Granularity): Date {
+  switch (granularity) {
+    case "hour":
+      return new Date(date.getTime() + 3_600_000)
+    case "day":
+      return addDays(date, 1)
+    case "week":
+      return addDays(date, 7)
+    case "month":
+      return new Date(date.getFullYear(), date.getMonth() + 1, 1)
+  }
+}
+
+const two = (n: number) => String(n).padStart(2, "0")
+
+// Short labels go on the axis, long ones in the tooltip and the table.
+export function bucketLabel(bucket: MetricInterval, granularity: Granularity, long = false): string {
+  const start = new Date(bucket.from)
+  const day = `${two(start.getDate())}/${two(start.getMonth() + 1)}`
+  switch (granularity) {
+    case "hour":
+      return long ? `De ${two(start.getHours())} a ${two((start.getHours() + 1) % 24)} h` : `${two(start.getHours())} h`
+    case "day":
+      return long ? `${day}/${start.getFullYear()}` : day
+    case "week":
+      return long ? `Semana del ${day}` : day
+    case "month": {
+      const month = start.toLocaleDateString("es-AR", { month: "short" }).replace(".", "")
+      return long ? `${month} ${start.getFullYear()}` : month
+    }
+  }
+}
+
+export const GRANULARITY_UNIT: Record<Granularity, string> = { hour: "hora", day: "día", week: "semana", month: "mes" }
+
+// One request per bucket, a few at a time so a long period doesn't flood the gateway. Stops
+// early when the period changed (isCurrent) or a bucket failed; null means "discard".
+const SERIES_CONCURRENCY = 4
+
+export async function getMetricSeries(key: MetricKey, buckets: MetricInterval[], isCurrent: () => boolean): Promise<number[] | null> {
+  const values = new Array<number>(buckets.length).fill(0)
+  let next = 0
+  let failed = false
+  const worker = async () => {
+    while (next < buckets.length && !failed && isCurrent()) {
+      const i = next++
+      try {
+        values[i] = await getMetric(key, buckets[i])
+      } catch (err) {
+        failed = true
+        throw err
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(SERIES_CONCURRENCY, buckets.length) }, worker))
+  return isCurrent() ? values : null
 }

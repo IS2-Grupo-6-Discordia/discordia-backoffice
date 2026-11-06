@@ -2,15 +2,40 @@ import { useCallback, useEffect, useRef, useState, type ComponentProps } from "r
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { ApiError, friendlyError } from "@/api/client"
-import { customPeriod, getMetric, presetPeriod, type PeriodPreset } from "@/api/metrics"
-import type { MetricKey, MetricPeriod } from "@/api/types"
+import {
+  bucketLabel,
+  customPeriod,
+  getMetric,
+  getMetricSeries,
+  GRANULARITY_UNIT,
+  periodBuckets,
+  presetPeriod,
+  type PeriodPreset,
+} from "@/api/metrics"
+import type { Granularity, MetricInterval, MetricKey, MetricPeriod } from "@/api/types"
 import { useAuth } from "@/context/AuthContext"
 import PressableScale from "@/components/PressableScale"
 import { formatDate } from "@/components/dossier/DossierParts"
+import MetricChart, { CHART_HEIGHT, formatCount } from "@/components/metrics/MetricChart"
 
 type IconName = ComponentProps<typeof Ionicons>["name"]
 
 type MetricState = { status: "loading" } | { status: "ok"; value: number } | { status: "error"; message: string }
+
+type SeriesData = { granularity: Granularity; buckets: MetricInterval[]; values: number[] }
+
+// "loading" keeps the previous series so the chart holds its frame while it refetches.
+type SeriesState =
+  | { status: "idle" }
+  | { status: "loading"; previous: SeriesData | null }
+  | { status: "ok"; data: SeriesData }
+  | { status: "error"; message: string }
+
+function seriesData(state: SeriesState): SeriesData | null {
+  if (state.status === "ok") return state.data
+  if (state.status === "loading") return state.previous
+  return null
+}
 
 const PRESETS: { value: PeriodPreset; label: string }[] = [
   { value: "today", label: "Hoy" },
@@ -21,29 +46,46 @@ const PRESETS: { value: PeriodPreset; label: string }[] = [
   { value: "custom", label: "Elegir fechas" },
 ]
 
-const METRICS: { key: MetricKey; label: string; hint: string; icon: IconName; color: string; bg: string }[] = [
+// `color` is the icon's identity hue; `chart` is the same hue one step darker, so the columns sit
+// inside the lightness band for the dark surface (checked with the dataviz palette validator).
+const METRICS: {
+  key: MetricKey
+  label: string
+  hint: string
+  seriesLabel: string
+  icon: IconName
+  color: string
+  chart: string
+  bg: string
+}[] = [
   {
     key: "activeUsers",
     label: "Usuarios activos",
-    hint: "Cuentas que usaron Discordia en el período.",
+    hint: "Cuentas que usaron Discordia en el período. En el gráfico, cada una cuenta una vez por barra.",
+    seriesLabel: "Usuarios activos",
     icon: "people-outline",
     color: "#37D6C0",
+    chart: "#0EA996",
     bg: "rgba(55,214,192,0.15)",
   },
   {
     key: "serversCreated",
     label: "Servidores creados",
     hint: "Servidores nuevos en toda la plataforma.",
+    seriesLabel: "Servidores creados",
     icon: "server-outline",
     color: "#A093FF",
+    chart: "#8E80EA",
     bg: "rgba(160,147,255,0.15)",
   },
   {
     key: "messagesSent",
     label: "Mensajes enviados",
     hint: "Mensajes en los canales de todos los servidores.",
+    seriesLabel: "Mensajes enviados",
     icon: "chatbubbles-outline",
     color: "#F0C24B",
+    chart: "#B58C01",
     bg: "rgba(240,194,75,0.15)",
   },
 ]
@@ -52,6 +94,12 @@ const ALL_LOADING: Record<MetricKey, MetricState> = {
   activeUsers: { status: "loading" },
   serversCreated: { status: "loading" },
   messagesSent: { status: "loading" },
+}
+
+const ALL_IDLE: Record<MetricKey, SeriesState> = {
+  activeUsers: { status: "idle" },
+  serversCreated: { status: "idle" },
+  messagesSent: { status: "idle" },
 }
 
 // A 404 here means the gateway or the service still lacks the route, not that a resource is missing.
@@ -69,29 +117,58 @@ export default function MetricsScreen() {
   const [preset, setPreset] = useState<PeriodPreset>("30d")
   const [period, setPeriod] = useState<MetricPeriod>(() => presetPeriod("30d"))
   const [metrics, setMetrics] = useState<Record<MetricKey, MetricState>>(ALL_LOADING)
+  const [series, setSeries] = useState<Record<MetricKey, SeriesState>>(ALL_IDLE)
   const [startText, setStartText] = useState("")
   const [endText, setEndText] = useState(todayText)
   const [customError, setCustomError] = useState("")
   const requestIds = useRef<Record<MetricKey, number>>({ activeUsers: 0, serversCreated: 0, messagesSent: 0 })
 
+  const loadSeries = useCallback(
+    async (key: MetricKey, target: MetricPeriod) => {
+      const current = ++requestIds.current[key]
+      const isCurrent = () => current === requestIds.current[key]
+      const { granularity, buckets } = periodBuckets(target)
+      setSeries((prev) => ({ ...prev, [key]: { status: "loading", previous: seriesData(prev[key]) } }))
+      try {
+        const values = await getMetricSeries(key, buckets, isCurrent)
+        if (!values || !isCurrent()) return
+        setSeries((prev) => ({ ...prev, [key]: { status: "ok", data: { granularity, buckets, values } } }))
+      } catch (err) {
+        if (!isCurrent()) return
+        if (err instanceof ApiError && err.status === 401) {
+          logout()
+          return
+        }
+        setSeries((prev) => ({ ...prev, [key]: { status: "error", message: metricError(err) } }))
+      }
+    },
+    [logout],
+  )
+
+  // The total goes first and the series only after it answers: if a service is down, its card
+  // fails once instead of firing one doomed request per bucket.
   const loadMetric = useCallback(
     async (key: MetricKey, target: MetricPeriod) => {
       const current = ++requestIds.current[key]
       setMetrics((prev) => ({ ...prev, [key]: { status: "loading" } }))
+      setSeries((prev) => ({ ...prev, [key]: { status: "loading", previous: seriesData(prev[key]) } }))
       try {
         const value = await getMetric(key, target)
         if (current !== requestIds.current[key]) return
         setMetrics((prev) => ({ ...prev, [key]: { status: "ok", value } }))
       } catch (err) {
         if (current !== requestIds.current[key]) return
+        setSeries((prev) => ({ ...prev, [key]: { status: "idle" } }))
         if (err instanceof ApiError && err.status === 401) {
           logout()
           return
         }
         setMetrics((prev) => ({ ...prev, [key]: { status: "error", message: metricError(err) } }))
+        return
       }
+      await loadSeries(key, target)
     },
-    [logout],
+    [logout, loadSeries],
   )
 
   const loadAll = useCallback(
@@ -243,7 +320,14 @@ export default function MetricsScreen() {
         <>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 12, paddingHorizontal: 16 }}>
             {METRICS.map((m) => (
-              <MetricCard key={m.key} metric={m} state={metrics[m.key]} onRetry={() => loadMetric(m.key, period)} />
+              <MetricCard
+                key={m.key}
+                metric={m}
+                state={metrics[m.key]}
+                series={series[m.key]}
+                onRetry={() => loadMetric(m.key, period)}
+                onRetrySeries={() => loadSeries(m.key, period)}
+              />
             ))}
           </View>
           {noActivity ? (
@@ -313,21 +397,65 @@ function DayField({
   )
 }
 
-function MetricCard({
+function MetricSeries({
   metric,
-  state,
+  series,
   onRetry,
 }: {
   metric: (typeof METRICS)[number]
-  state: MetricState
+  series: SeriesState
   onRetry: () => void
+}) {
+  if (series.status === "idle") return null
+  if (series.status === "error") {
+    return (
+      <View style={{ height: CHART_HEIGHT + 24, justifyContent: "center", gap: 4 }}>
+        <Text style={{ color: "#FF7F72", fontSize: 12.5 }}>No pudimos cargar la evolución. {series.message}</Text>
+        <Pressable onPress={onRetry} accessibilityLabel={`Reintentar el gráfico de ${metric.label.toLowerCase()}`} style={{ alignSelf: "flex-start" }}>
+          <Text style={{ color: "#37D6C0", fontWeight: "700", fontSize: 13 }}>Reintentar</Text>
+        </Pressable>
+      </View>
+    )
+  }
+  const data = seriesData(series)
+  if (!data) {
+    return (
+      <View style={{ height: CHART_HEIGHT + 24, justifyContent: "center" }}>
+        <ActivityIndicator color="#37D6C0" />
+      </View>
+    )
+  }
+  return (
+    <MetricChart
+      color={metric.chart}
+      values={data.values}
+      labels={data.buckets.map((b) => bucketLabel(b, data.granularity))}
+      longLabels={data.buckets.map((b) => bucketLabel(b, data.granularity, true))}
+      caption={`${metric.seriesLabel} por ${GRANULARITY_UNIT[data.granularity]}`}
+      dimmed={series.status === "loading"}
+    />
+  )
+}
+
+function MetricCard({
+  metric,
+  state,
+  series,
+  onRetry,
+  onRetrySeries,
+}: {
+  metric: (typeof METRICS)[number]
+  state: MetricState
+  series: SeriesState
+  onRetry: () => void
+  onRetrySeries: () => void
 }) {
   return (
     <View
       accessibilityLabel={state.status === "ok" ? `${metric.label}: ${state.value}` : metric.label}
       style={{
         flexGrow: 1,
-        flexBasis: 220,
+        flexBasis: 320,
         minHeight: 132,
         borderRadius: 14,
         padding: 16,
@@ -352,7 +480,8 @@ function MetricCard({
         <Text style={{ color: "#E6F3F3", fontWeight: "800", fontSize: 14 }}>{metric.label}</Text>
       </View>
 
-      <View style={{ flex: 1, justifyContent: "center", marginTop: 10 }}>
+      {/* Fixed height, so the three charts start at the same line whatever each card holds. */}
+      <View style={{ minHeight: 48, justifyContent: "center", marginTop: 10 }}>
         {state.status === "loading" ? (
           <ActivityIndicator color="#37D6C0" style={{ alignSelf: "flex-start" }} />
         ) : state.status === "error" ? (
@@ -363,11 +492,17 @@ function MetricCard({
             </Pressable>
           </View>
         ) : (
-          <Text style={{ color: "#E6F3F3", fontSize: 30, fontWeight: "800" }}>{state.value.toLocaleString("es-AR")}</Text>
+          <Text style={{ color: "#E6F3F3", fontSize: 30, fontWeight: "800" }}>{formatCount(state.value)}</Text>
         )}
       </View>
 
-      <Text style={{ color: "#8DA8AC", fontSize: 12, marginTop: 6 }}>{metric.hint}</Text>
+      {state.status === "error" ? null : (
+        <View style={{ marginTop: 14 }}>
+          <MetricSeries metric={metric} series={series} onRetry={onRetrySeries} />
+        </View>
+      )}
+
+      <Text style={{ color: "#8DA8AC", fontSize: 12, marginTop: "auto", paddingTop: 10 }}>{metric.hint}</Text>
     </View>
   )
 }
