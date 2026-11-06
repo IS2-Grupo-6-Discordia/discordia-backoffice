@@ -11,7 +11,7 @@ Mismo stack y sistema de diseño que `discordia-cliente-web` (Expo Router + Reac
 | Recupero | [Backoffice] Recupero de contraseña | Pide el mail de recupero. El link lleva al cliente web (`FRONTEND_BASE_URL` de autenticación). |
 | Usuarios | ADMINISTRACIÓN HU-1, HU-2, HU-5 | Búsqueda por nombre o email, filtro Todos / Activos / Suspendidos, suspender y reactivar con confirmación. |
 | Servidores | ADMINISTRACIÓN HU-3 | Listado con nombre, cantidad de miembros y fecha de creación, con búsqueda por nombre. |
-| Métricas | MÉTRICAS HU-2 | Usuarios activos, servidores creados y mensajes enviados en toda la plataforma, para un período predefinido (hoy, 7, 30 o 90 días, 12 meses) o entre dos fechas. |
+| Métricas | MÉTRICAS HU-2 | Usuarios activos, servidores creados y mensajes enviados en toda la plataforma, para un período predefinido (hoy, 7, 30 o 90 días, 12 meses) o entre dos fechas, con un gráfico de su evolución en ese período. |
 
 No hay registro: el staff no se autorregistra. Para dar acceso a alguien, primero se registra
 como usuario común en el cliente web y después se le asigna el rol desde autenticación:
@@ -55,6 +55,35 @@ servicios, y si uno está caído, solo su tarjeta muestra el error y las otras s
   todavía no existen) muestra "Este dato todavía no está disponible."; un `5xx`, el mensaje genérico
   con el código del `X-Request-Id`. Si el servicio no responde, el gateway corta a los 15 segundos.
   "Actualizar" no espera a la tarjeta lenta: solo se deshabilita mientras cargan las tres.
+
+### Evolución en el período
+
+Debajo del total, cada tarjeta muestra un gráfico de columnas con la misma métrica partida en
+intervalos (`components/metrics/MetricChart.tsx`). Cada métrica tiene su propio eje, porque las
+escalas son muy distintas (decenas de servidores contra miles de mensajes).
+
+| Período | Una columna por | Columnas |
+| --- | --- | --- |
+| Hoy | hora, hasta la hora actual | hasta 24 |
+| Hasta 31 días | día | hasta 31 |
+| Hasta 120 días | semana, contada desde el primer día | hasta 18 |
+| Más largo | mes calendario (el primero y el último pueden ser parciales) | hasta 13 |
+
+- **Sin endpoints nuevos:** cada columna es un pedido más al mismo endpoint, con el `from` y el `to`
+  de ese intervalo (`periodBuckets` y `getMetricSeries` en `api/metrics.ts`). Van de a 4 por
+  métrica, y la serie se pide recién cuando el total respondió, así un servicio caído no recibe un
+  pedido por columna. Con 30 días son 31 pedidos por métrica. Si eso se vuelve pesado, el paso
+  siguiente es que cada servicio devuelva la serie entera en un solo pedido.
+- **Usuarios activos** cuenta cuentas distintas *por columna*: alguien que entró tres días aparece en
+  tres columnas, así que la suma de las columnas puede superar el total del período.
+- **Interacción:** pasar el mouse (o el foco del teclado, o tocar en el celular) por una columna
+  muestra su valor y su intervalo. La columna más alta lleva su valor encima, y "Ver tabla" muestra
+  todos los valores sin depender del mouse.
+- **Colores:** las columnas usan el tono de cada métrica un paso más oscuro que el del ícono
+  (`#0EA996`, `#8E80EA`, `#B58C01`), validados para la superficie oscura de la tarjeta.
+- Al cambiar de período, el gráfico anterior queda atenuado hasta que llega el nuevo, en lugar de
+  vaciarse. Si falla algún intervalo, el gráfico muestra el error con "Reintentar" y el total sigue
+  visible.
 
 ### Pendiente: mensajes
 

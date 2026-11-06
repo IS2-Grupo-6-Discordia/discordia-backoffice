@@ -38,9 +38,21 @@ export type MetricKey = "activeUsers" | "serversCreated" | "messagesSent"
 
 // Half-open interval [from, to) in UTC, built from local day boundaries.
 // firstDay and lastDay are the calendar days shown to the staff.
-export interface MetricPeriod {
-  from: string
-  to: string
+export interface MetricPeriod extends MetricInterval {
   firstDay: string
   lastDay: string
+}
+
+// Half-open interval [from, to), ISO-8601 in UTC: what the metrics endpoints receive.
+export interface MetricInterval {
+  from: string
+  to: string
+}
+
+export type Granularity = "hour" | "day" | "week" | "month"
+
+// The period split into consecutive buckets for the chart; the last one ends at the period's end.
+export interface MetricBuckets {
+  granularity: Granularity
+  buckets: MetricInterval[]
 }
