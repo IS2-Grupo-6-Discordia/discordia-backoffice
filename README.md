@@ -85,22 +85,16 @@ escalas son muy distintas (decenas de servidores contra miles de mensajes).
   vaciarse. Si falla algún intervalo, el gráfico muestra el error con "Reintentar" y el total sigue
   visible.
 
-### Pendiente: mensajes
+### Mensajes y el despertador
 
-Las tres rutas ya están en el gateway, pero mensajes todavía no está deployado en Render, así que
-esa tarjeta muestra el error. Para que funcione, sin tocar el código de esta pantalla:
+Mensajes es el único servicio de las métricas que el resto del backoffice no usa, así que nada más
+lo despierta. Si está dormido, el pedido del gateway no lo despierta (ver
+[Servicios dormidos en Render](#servicios-dormidos-en-render)), y la tarjeta de mensajes muestra
+el error aunque el servicio funcione. Por eso `/livez` de mensajes está en
+`RENDER_DEFAULT_WAKE_URLS` (`api/wake.ts`), igual que en el cliente web.
 
-1. **mensajes:** mergear `develop` (con `GET /api/v1/admin/metrics/messages` y `/livez`) a `main`
-   y deployarlo en Render con `MONGODB_URL` (Atlas) e `INTERNAL_SECRET`. El índice sobre
-   `created_at` se crea solo al arrancar.
-2. **gateway (Render):** `MS_MENSAJES_URL=https://microservicio-mensajes.onrender.com` e
-   `INTERNAL_SECRET_MENSAJES` igual al `INTERNAL_SECRET` de mensajes.
-3. **backoffice:** sumar `https://microservicio-mensajes.onrender.com/livez` a
-   `RENDER_DEFAULT_WAKE_URLS` en `api/wake.ts`, como ya hace el cliente web. No se agrega antes:
-   el login espera a que respondan **todas** esas URLs, y con mensajes caído cada login tardaría
-   hasta dos minutos.
-4. **Probar:** con una cuenta de staff, la tarjeta muestra un número, y `GET
-   /api/v1/admin/metrics/messages` sin token sigue respondiendo `401`.
+Cuidado: el login espera a que respondan **todas** esas URLs. Si mensajes se cae, el login tarda
+hasta dos minutos en avisar que no pudo despertar los servidores.
 
 ## Desarrollo local
 
@@ -139,8 +133,8 @@ si la request viene de otro servicio de Render** (el gateway): responde `429` co
 al health check de cada backend (`api/wake.ts`), que sí los despierta, y el login espera a que
 respondan mostrando "Estamos despertando el servidor".
 
-- Si `EXPO_PUBLIC_API_URL` apunta a Render, se usan las URLs de producción de autenticación y
-  servidores.
+- Si `EXPO_PUBLIC_API_URL` apunta a Render, se usan las URLs de producción de autenticación,
+  servidores y mensajes.
 - `EXPO_PUBLIC_WAKE_URLS` (opcional) reemplaza esa lista: URLs separadas por coma. Definida vacía,
   desactiva el despertador. Cuando un servicio nuevo pase a depender del gateway, hay que agregar
   su health check acá.
