@@ -9,7 +9,7 @@ import { useWakeState } from "@/api/wake"
 type IoniconName = React.ComponentProps<typeof Ionicons>["name"]
 
 const NAV_ITEMS: {
-  href: "/(main)/users" | "/(main)/servers" | "/(main)/reports" | "/(main)/metrics"
+  href: "/(main)/users" | "/(main)/servers" | "/(main)/reports" | "/(main)/metrics" | "/(main)/observability"
   path: string
   dossierPath?: string
   label: string
@@ -19,6 +19,7 @@ const NAV_ITEMS: {
   { href: "/(main)/servers", path: "/servers", dossierPath: "/expediente/servidor", label: "Servidores", icon: "server-outline" },
   { href: "/(main)/reports", path: "/reports", label: "Reportes", icon: "flag-outline" },
   { href: "/(main)/metrics", path: "/metrics", label: "Métricas", icon: "stats-chart-outline" },
+  { href: "/(main)/observability", path: "/observability", label: "Observabilidad", icon: "pulse-outline" },
 ]
 
 function initialsFor(name: string): string {
