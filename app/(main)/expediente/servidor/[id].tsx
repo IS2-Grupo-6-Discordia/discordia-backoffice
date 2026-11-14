@@ -4,7 +4,13 @@ import { Ionicons } from "@expo/vector-icons"
 import { useLocalSearchParams, useRouter } from "expo-router"
 import { deleteServer, reactivateServer, suspendServer } from "@/api/admin"
 import { ApiError, friendlyError } from "@/api/client"
-import { getServerDossier, getUserNames, type ServerDossier } from "@/api/dossier"
+import {
+  getServerDossier,
+  getServerMessageActivity,
+  getUserNames,
+  type ServerDossier,
+  type ServerMessageActivity,
+} from "@/api/dossier"
 import { useAuth } from "@/context/AuthContext"
 import Tag from "@/components/Tag"
 import {
@@ -59,6 +65,8 @@ export default function ServerDossierScreen() {
   const wide = useWindowDimensions().width >= 900
   const [dossier, setDossier] = useState<ServerDossier | null>(null)
   const [names, setNames] = useState<Map<string, string>>(new Map())
+  const [activity, setActivity] = useState<ServerMessageActivity | null>(null)
+  const [activityError, setActivityError] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [gone, setGone] = useState<"missing" | "deleted" | null>(null)
@@ -74,7 +82,18 @@ export default function ServerDossierScreen() {
     try {
       const data = await getServerDossier(id)
       setDossier(data)
+      let messages: ServerMessageActivity | null = null
+      setActivityError("")
+      if (data.messagingAvailable) {
+        try {
+          messages = await getServerMessageActivity(id)
+        } catch (err) {
+          setActivityError(friendlyError(err))
+        }
+      }
+      setActivity(messages)
       const ids = [
+        ...(messages?.recent.map((m) => m.authorId) ?? []),
         data.server.ownerId,
         ...data.recentJoins.map((j) => j.userId),
         ...data.reports.map((r) => r.reporterId),
@@ -197,7 +216,52 @@ export default function ServerDossierScreen() {
 
       <Section icon="chatbubbles-outline" title="Actividad de mensajería reciente">
         {dossier.messagingAvailable ? (
-          <Empty text="Sin mensajes recientes." />
+          activityError ? (
+            <Empty text={`No se pudo cargar la actividad: ${activityError}`} />
+          ) : !activity ? (
+            <ActivityIndicator color="#37D6C0" style={{ marginVertical: 12 }} />
+          ) : (
+            <>
+              <InfoRow label="Mensajes en total" value={String(activity.totalMessages)} />
+              <InfoRow label="Últimos 7 días" value={String(activity.messagesLast7Days)} />
+              <InfoRow label="Miembros que escribieron (7 días)" value={String(activity.activeAuthorsLast7Days)} />
+              <InfoRow label="Último mensaje" value={activity.lastMessageAt ? formatDateTime(activity.lastMessageAt) : "Nunca"} />
+              {activity.recent.length ? (
+                <View style={{ marginTop: 10, gap: 8 }}>
+                  {activity.recent.map((m) => (
+                    <View
+                      key={m.id}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 8,
+                        borderRadius: 8,
+                        borderLeftWidth: 3,
+                        borderLeftColor: m.deleted ? "#5E7E82" : "#37D6C0",
+                        backgroundColor: "rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <Pressable onPress={() => router.push(`/(main)/expediente/usuario/${m.authorId}`)} accessibilityRole="link">
+                        <Text style={{ color: "#8DA8AC", fontSize: 11.5 }}>
+                          <Text style={{ color: "#37D6C0", fontWeight: "700" }}>{names.get(m.authorId) ?? "Usuario"}</Text>
+                          {" · "}
+                          {formatDateTime(m.createdAt)}
+                          {m.edited && !m.deleted ? " · editado" : ""}
+                        </Text>
+                      </Pressable>
+                      <Text
+                        style={{ color: m.deleted ? "#5E7E82" : "#E6F3F3", fontSize: 13, marginTop: 3, fontStyle: m.deleted ? "italic" : "normal" }}
+                        numberOfLines={4}
+                      >
+                        {m.deleted ? "Mensaje eliminado" : m.content}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Empty text="Este servidor todavía no tiene mensajes." />
+              )}
+            </>
+          )
         ) : (
           <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start" }}>
             <Ionicons name="time-outline" size={15} color="#F0C24B" style={{ marginTop: 1 }} />
