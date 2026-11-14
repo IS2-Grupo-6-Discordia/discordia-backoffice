@@ -304,3 +304,54 @@ export async function resolveReport(reportId: string, status: "reviewed" | "dism
   })
   return toReport(res)
 }
+
+export interface ServerRecentMessage {
+  id: string
+  channelId: string
+  authorId: string
+  content: string | null
+  createdAt: string
+  edited: boolean
+  deleted: boolean
+}
+
+export interface ServerMessageActivity {
+  totalMessages: number
+  messagesLast7Days: number
+  activeAuthorsLast7Days: number
+  lastMessageAt: string | null
+  recent: ServerRecentMessage[]
+}
+
+export async function getServerMessageActivity(serverId: string): Promise<ServerMessageActivity> {
+  const res = await api<{
+    total_messages: number
+    messages_last_7_days: number
+    active_authors_last_7_days: number
+    last_message_at: string | null
+    recent: {
+      id: string
+      channel_id: string
+      author_id: string
+      content: string | null
+      created_at: string
+      edited: boolean
+      deleted: boolean
+    }[]
+  }>(`/admin/servers/${serverId}/messages/activity`)
+  return {
+    totalMessages: res.total_messages,
+    messagesLast7Days: res.messages_last_7_days,
+    activeAuthorsLast7Days: res.active_authors_last_7_days,
+    lastMessageAt: res.last_message_at,
+    recent: res.recent.map((m) => ({
+      id: m.id,
+      channelId: m.channel_id,
+      authorId: m.author_id,
+      content: m.content,
+      createdAt: m.created_at,
+      edited: m.edited,
+      deleted: m.deleted,
+    })),
+  }
+}
