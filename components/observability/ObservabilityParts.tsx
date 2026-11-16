@@ -1,5 +1,5 @@
 import type { ReactNode } from "react"
-import { ActivityIndicator, Pressable, Text, View } from "react-native"
+import { ActivityIndicator, Pressable, Text, View, useWindowDimensions } from "react-native"
 import { Ionicons } from "@expo/vector-icons"
 import { formatTime, serviceColor, serviceLabel, type LogLine } from "@/api/observability"
 
@@ -19,7 +19,7 @@ export function FilterChips<T extends string>({
 }) {
   const items: { value: T | null; label: string }[] = allLabel ? [{ value: null, label: allLabel }, ...options] : options
   return (
-    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, flexShrink: 1, minWidth: 0 }}>
       {items.map((item) => {
         const active = item.value === value
         return (
@@ -70,41 +70,60 @@ export function LevelTag({ level }: { level: string | null }) {
 }
 
 export function LogRow({ line, onOpenTrace }: { line: LogLine; onOpenTrace?: (traceId: string) => void }) {
-  return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "flex-start",
-        gap: 10,
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: "rgba(255,255,255,0.06)",
-      }}
-    >
-      <Text style={{ color: "#5E7E82", fontSize: 11.5, width: 108, fontVariant: ["tabular-nums"] }}>{formatTime(line.timestamp)}</Text>
-      <LevelTag level={line.level} />
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 5, width: 104 }}>
-        <ServiceDot service={line.service} />
-        <Text style={{ color: "#C9DADB", fontSize: 12 }} numberOfLines={1}>
-          {serviceLabel(line.service)}
+  const narrow = useWindowDimensions().width < 600
+  const time = <Text style={{ color: "#5E7E82", fontSize: 11.5, width: narrow ? undefined : 108, fontVariant: ["tabular-nums"] }}>{formatTime(line.timestamp)}</Text>
+  const service = (
+    <View style={{ flexDirection: "row", alignItems: "center", gap: 5, width: narrow ? undefined : 104, flexShrink: 1 }}>
+      <ServiceDot service={line.service} />
+      <Text style={{ color: "#C9DADB", fontSize: 12 }} numberOfLines={1}>
+        {serviceLabel(line.service)}
+      </Text>
+    </View>
+  )
+  const traceLink =
+    line.traceId && onOpenTrace ? (
+      <Pressable onPress={() => onOpenTrace(line.traceId!)} accessibilityRole="link" accessibilityLabel="Abrir la traza" hitSlop={6} style={narrow ? { marginLeft: "auto" } : undefined}>
+        <Text style={{ color: "#37D6C0", fontSize: 12, fontWeight: "700" }}>Traza</Text>
+      </Pressable>
+    ) : null
+  const body = (
+    <View style={{ flex: narrow ? undefined : 1, minWidth: 0 }}>
+      <Text style={{ color: "#E6F3F3", fontSize: 12.5, fontFamily: "monospace" }} numberOfLines={narrow ? 6 : 3}>
+        {line.message}
+      </Text>
+      {line.requestId ? (
+        <Text style={{ color: "#5E7E82", fontSize: 11, marginTop: 2 }} selectable>
+          request_id {line.requestId}
         </Text>
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ color: "#E6F3F3", fontSize: 12.5, fontFamily: "monospace" }} numberOfLines={3}>
-          {line.message}
-        </Text>
-        {line.requestId ? (
-          <Text style={{ color: "#5E7E82", fontSize: 11, marginTop: 2 }} selectable>
-            request_id {line.requestId}
-          </Text>
-        ) : null}
-      </View>
-      {line.traceId && onOpenTrace ? (
-        <Pressable onPress={() => onOpenTrace(line.traceId!)} accessibilityRole="link" accessibilityLabel="Abrir la traza" hitSlop={6}>
-          <Text style={{ color: "#37D6C0", fontSize: 12, fontWeight: "700" }}>Traza</Text>
-        </Pressable>
       ) : null}
+    </View>
+  )
+  const rowStyle = {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.06)",
+  }
+  if (narrow) {
+    return (
+      <View style={{ ...rowStyle, gap: 6 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          {time}
+          <LevelTag level={line.level} />
+          {service}
+          {traceLink}
+        </View>
+        {body}
+      </View>
+    )
+  }
+  return (
+    <View style={{ ...rowStyle, flexDirection: "row", alignItems: "flex-start", gap: 10 }}>
+      {time}
+      <LevelTag level={line.level} />
+      {service}
+      {body}
+      {traceLink}
     </View>
   )
 }
