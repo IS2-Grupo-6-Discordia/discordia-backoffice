@@ -160,10 +160,15 @@ export default function UsersScreen() {
             <Text style={{ color: "#8DA8AC", fontSize: 12, marginTop: 2 }} numberOfLines={1}>
               {compact ? item.email : `${item.email} · Alta ${formatDate(item.createdAt)}`}
             </Text>
+            {compact ? (
+              <View style={{ flexDirection: "row", marginTop: 5 }}>
+                <Tag type={item.isActive ? "ok" : "sus"}>{item.isActive ? "Activo" : "Suspendido"}</Tag>
+              </View>
+            ) : null}
           </View>
         </Pressable>
 
-        <Tag type={item.isActive ? "ok" : "sus"}>{item.isActive ? "Activo" : "Suspendido"}</Tag>
+        {compact ? null : <Tag type={item.isActive ? "ok" : "sus"}>{item.isActive ? "Activo" : "Suspendido"}</Tag>}
 
         <View style={{ width: compact ? 92 : 104, alignItems: "flex-end" }}>
           {isMe ? null : item.isActive ? (
