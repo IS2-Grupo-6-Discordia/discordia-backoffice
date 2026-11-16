@@ -13,13 +13,14 @@ const NAV_ITEMS: {
   path: string
   dossierPath?: string
   label: string
+  shortLabel?: string
   icon: IoniconName
 }[] = [
   { href: "/(main)/users", path: "/users", dossierPath: "/expediente/usuario", label: "Usuarios", icon: "people-outline" },
   { href: "/(main)/servers", path: "/servers", dossierPath: "/expediente/servidor", label: "Servidores", icon: "server-outline" },
   { href: "/(main)/reports", path: "/reports", label: "Reportes", icon: "flag-outline" },
   { href: "/(main)/metrics", path: "/metrics", label: "Métricas", icon: "stats-chart-outline" },
-  { href: "/(main)/observability", path: "/observability", label: "Observabilidad", icon: "pulse-outline" },
+  { href: "/(main)/observability", path: "/observability", label: "Observabilidad", shortLabel: "Observ.", icon: "pulse-outline" },
 ]
 
 function initialsFor(name: string): string {
@@ -93,48 +94,82 @@ export default function MainLayout() {
           </View>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: 4, paddingHorizontal: compact ? 0 : 4 }}
-          style={compact ? ({ order: 3, width: "100%", flexBasis: "100%" } as object) : { flexGrow: 1 }}
-        >
-          {NAV_ITEMS.map((item) => {
-            const active = pathname.startsWith(item.path) || (!!item.dossierPath && pathname.startsWith(item.dossierPath))
-            return (
-              <Pressable
-                key={item.path}
-                onPress={() => router.replace(item.href)}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                style={({ hovered }: { pressed: boolean; hovered?: boolean }) => ({
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 6,
-                  paddingHorizontal: 12,
-                  paddingVertical: 7,
-                  borderRadius: 9999,
-                  backgroundColor: active
-                    ? "rgba(55,214,192,0.15)"
-                    : hovered
-                      ? "rgba(255,255,255,0.06)"
-                      : "transparent",
-                })}
-              >
-                <Ionicons name={item.icon} size={15} color={active ? "#37D6C0" : "#8DA8AC"} />
-                <Text
+        {compact ? (
+          <View style={{ order: 3, width: "100%", flexBasis: "100%", flexDirection: "row", gap: 4 } as object}>
+            {NAV_ITEMS.map((item) => {
+              const active = pathname.startsWith(item.path) || (!!item.dossierPath && pathname.startsWith(item.dossierPath))
+              return (
+                <Pressable
+                  key={item.path}
+                  onPress={() => router.replace(item.href)}
+                  accessibilityRole="tab"
+                  accessibilityLabel={item.label}
+                  accessibilityState={{ selected: active }}
                   style={{
-                    fontSize: 13,
-                    color: active ? "#E6F3F3" : "#8DA8AC",
-                    fontWeight: active ? "700" : "500",
+                    flex: 1,
+                    minWidth: 0,
+                    alignItems: "center",
+                    gap: 3,
+                    paddingVertical: 6,
+                    borderRadius: 10,
+                    backgroundColor: active ? "rgba(55,214,192,0.15)" : "transparent",
                   }}
                 >
-                  {item.label}
-                </Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
+                  <Ionicons name={item.icon} size={17} color={active ? "#37D6C0" : "#8DA8AC"} />
+                  <Text
+                    numberOfLines={1}
+                    style={{ fontSize: 10.5, color: active ? "#E6F3F3" : "#8DA8AC", fontWeight: active ? "700" : "500" }}
+                  >
+                    {item.shortLabel ?? item.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+        ) : (
+        <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 4, paddingHorizontal: compact ? 0 : 4 }}
+            style={compact ? ({ order: 3, width: "100%", flexBasis: "100%" } as object) : { flexGrow: 1 }}
+          >
+            {NAV_ITEMS.map((item) => {
+              const active = pathname.startsWith(item.path) || (!!item.dossierPath && pathname.startsWith(item.dossierPath))
+              return (
+                <Pressable
+                  key={item.path}
+                  onPress={() => router.replace(item.href)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  style={({ hovered }: { pressed: boolean; hovered?: boolean }) => ({
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingVertical: 7,
+                    borderRadius: 9999,
+                    backgroundColor: active
+                      ? "rgba(55,214,192,0.15)"
+                      : hovered
+                        ? "rgba(255,255,255,0.06)"
+                        : "transparent",
+                  })}
+                >
+                  <Ionicons name={item.icon} size={15} color={active ? "#37D6C0" : "#8DA8AC"} />
+                  <Text
+                    style={{
+                      fontSize: 13,
+                      color: active ? "#E6F3F3" : "#8DA8AC",
+                      fontWeight: active ? "700" : "500",
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </ScrollView>
+        )}
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginLeft: "auto" }}>
           <Avatar initials={initialsFor(user.name)} size={28} uri={user.avatarUrl} />
