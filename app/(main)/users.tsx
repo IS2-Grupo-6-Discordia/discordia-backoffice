@@ -153,7 +153,7 @@ export default function UsersScreen() {
                 {item.name}
               </Text>
               {item.role === "staff" ? (
-                <Text style={{ color: "#37D6C0", fontSize: 10.5, fontWeight: "800" }}>STAFF</Text>
+                <Text style={{ color: "#37D6C0", fontSize: 11, fontWeight: "800" }}>STAFF</Text>
               ) : null}
               {isMe ? <Text style={{ color: "#8DA8AC", fontSize: 11 }}>(vos)</Text> : null}
             </View>

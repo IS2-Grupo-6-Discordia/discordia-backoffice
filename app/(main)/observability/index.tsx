@@ -136,7 +136,7 @@ export default function ObservabilityScreen() {
         </Text>
       </View>
       <Text style={{ color: "#C9DADB", fontSize: 12.5, fontWeight: "700", fontVariant: ["tabular-nums"] }}>{formatDuration(item.durationMs)}</Text>
-      <Ionicons name="chevron-forward" size={15} color="#5E7E82" />
+      <Ionicons name="chevron-forward" size={15} color="#7F9DA1" />
     </Pressable>
   )
 
@@ -192,7 +192,7 @@ export default function ObservabilityScreen() {
               onChangeText={setCode}
               onSubmitEditing={searchCode}
               placeholder="a1b2c3d4"
-              placeholderTextColor="#5E7E82"
+              placeholderTextColor="#7F9DA1"
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={36}

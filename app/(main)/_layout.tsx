@@ -88,7 +88,7 @@ export default function MainLayout() {
               borderColor: "#37D6C0",
             }}
           >
-            <Text style={{ color: "#37D6C0", fontWeight: "800", fontSize: 10, letterSpacing: 0.6 }}>
+            <Text style={{ color: "#37D6C0", fontWeight: "800", fontSize: 11, letterSpacing: 0.6 }}>
               Staff
             </Text>
           </View>
@@ -118,7 +118,7 @@ export default function MainLayout() {
                   <Ionicons name={item.icon} size={17} color={active ? "#37D6C0" : "#8DA8AC"} />
                   <Text
                     numberOfLines={1}
-                    style={{ fontSize: 10.5, color: active ? "#E6F3F3" : "#8DA8AC", fontWeight: active ? "700" : "500" }}
+                    style={{ fontSize: 11, color: active ? "#E6F3F3" : "#8DA8AC", fontWeight: active ? "700" : "500" }}
                   >
                     {item.shortLabel ?? item.label}
                   </Text>

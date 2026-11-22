@@ -48,7 +48,7 @@ export function FilterChips<T extends string>({
 export function FilterRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-      <Text style={{ color: "#5E7E82", fontSize: 11.5, fontWeight: "700", width: 64 }}>{label}</Text>
+      <Text style={{ color: "#7F9DA1", fontSize: 11.5, fontWeight: "700", width: 64 }}>{label}</Text>
       {children}
     </View>
   )
@@ -58,20 +58,20 @@ export function ServiceDot({ service }: { service: string | null }) {
   return <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: serviceColor(service) }} />
 }
 
-const LEVEL_COLORS: Record<string, string> = { error: "#FF7F72", warn: "#F0C24B", info: "#8DA8AC", debug: "#5E7E82" }
+const LEVEL_COLORS: Record<string, string> = { error: "#FF7F72", warn: "#F0C24B", info: "#8DA8AC", debug: "#7F9DA1" }
 
 export function LevelTag({ level }: { level: string | null }) {
   const color = LEVEL_COLORS[level ?? ""] ?? "#8DA8AC"
   return (
     <View style={{ paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5, backgroundColor: `${color}22`, minWidth: 44, alignItems: "center" }}>
-      <Text style={{ color, fontSize: 10.5, fontWeight: "800", textTransform: "uppercase" }}>{level ?? "—"}</Text>
+      <Text style={{ color, fontSize: 11, fontWeight: "800", textTransform: "uppercase" }}>{level ?? "—"}</Text>
     </View>
   )
 }
 
 export function LogRow({ line, onOpenTrace }: { line: LogLine; onOpenTrace?: (traceId: string) => void }) {
   const narrow = useWindowDimensions().width < 600
-  const time = <Text style={{ color: "#5E7E82", fontSize: 11.5, width: narrow ? undefined : 108, fontVariant: ["tabular-nums"] }}>{formatTime(line.timestamp)}</Text>
+  const time = <Text style={{ color: "#7F9DA1", fontSize: 11.5, width: narrow ? undefined : 108, fontVariant: ["tabular-nums"] }}>{formatTime(line.timestamp)}</Text>
   const service = (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 5, width: narrow ? undefined : 104, flexShrink: 1 }}>
       <ServiceDot service={line.service} />
@@ -92,7 +92,7 @@ export function LogRow({ line, onOpenTrace }: { line: LogLine; onOpenTrace?: (tr
         {line.message}
       </Text>
       {line.requestId ? (
-        <Text style={{ color: "#5E7E82", fontSize: 11, marginTop: 2 }} selectable>
+        <Text style={{ color: "#7F9DA1", fontSize: 11, marginTop: 2 }} selectable>
           request_id {line.requestId}
         </Text>
       ) : null}
