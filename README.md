@@ -108,6 +108,8 @@ npx expo start --web --port 8091
 `http://localhost:18080/api/v1`, y el origen `http://localhost:8091` tiene que estar en
 `CORS_ALLOWED_ORIGIN_*` del gateway.
 
+`npm run typecheck` corre el chequeo de tipos con TypeScript. Es lo que corre el CI en cada push y en cada PR.
+
 ## Deploy
 
 Cloudflare Pages conectado al repo (rama `main`):
