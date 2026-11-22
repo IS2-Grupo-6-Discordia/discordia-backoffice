@@ -128,7 +128,7 @@ export default function MetricChart({
                   right: 6,
                   top: TOP_ROOM + PLOT_HEIGHT * (max === 0 ? 1 : 1 - tick / max) - 7,
                   color: TEXT_MUTED,
-                  fontSize: 10.5,
+                  fontSize: 11,
                   fontVariant: ["tabular-nums"],
                 }}
               >
@@ -254,7 +254,7 @@ export default function MetricChart({
                           right: last ? 0 : undefined,
                           textAlign: first ? "left" : last ? "right" : "center",
                           color: TEXT_MUTED,
-                          fontSize: 10.5,
+                          fontSize: 11,
                         }}
                       >
                         {labels[i]}

@@ -104,7 +104,7 @@ export function Empty({ text }: { text: string }) {
   return (
     <Text
       style={{
-        color: "#5E7E82",
+        color: "#7F9DA1",
         fontSize: 13,
         fontStyle: "italic",
         paddingVertical: 4,
@@ -148,7 +148,7 @@ export function ListRow({
         ) : null}
       </View>
       {right}
-      {onPress ? <Ionicons name="chevron-forward" size={15} color="#5E7E82" /> : null}
+      {onPress ? <Ionicons name="chevron-forward" size={15} color="#7F9DA1" /> : null}
     </View>
   )
   return onPress ? (
@@ -178,7 +178,7 @@ export function MessageQuote({ content, style }: { content: string; style?: View
       <Text style={{ color: "#E6F3F3", fontSize: 13 }} numberOfLines={6}>
         {content}
       </Text>
-      <Text style={{ color: "#5E7E82", fontSize: 10.5, marginTop: 3 }}>Copia del mensaje al momento del reporte</Text>
+      <Text style={{ color: "#7F9DA1", fontSize: 11, marginTop: 3 }}>Copia del mensaje al momento del reporte</Text>
     </View>
   )
 }

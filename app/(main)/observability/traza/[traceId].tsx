@@ -153,7 +153,7 @@ export default function TraceScreen() {
 
           <Section icon="document-text-outline" title="Logs de la traza" count={detail.logs.length}>
             {detail.logs.length === 0 ? (
-              <Text style={{ color: "#5E7E82", fontSize: 13, fontStyle: "italic" }}>Esta traza no tiene logs (o todavía no llegaron).</Text>
+              <Text style={{ color: "#7F9DA1", fontSize: 13, fontStyle: "italic" }}>Esta traza no tiene logs (o todavía no llegaron).</Text>
             ) : (
               <View style={{ marginHorizontal: -16 }}>
                 {detail.logs.map((line, i) => (
@@ -171,7 +171,7 @@ export default function TraceScreen() {
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "error" }) {
   return (
     <View>
-      <Text style={{ color: "#5E7E82", fontSize: 11, fontWeight: "700" }}>{label}</Text>
+      <Text style={{ color: "#7F9DA1", fontSize: 11, fontWeight: "700" }}>{label}</Text>
       <Text style={{ color: tone === "error" ? "#FF7F72" : "#E6F3F3", fontSize: 15, fontWeight: "800", marginTop: 1 }}>{value}</Text>
     </View>
   )

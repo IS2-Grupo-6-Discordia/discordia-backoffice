@@ -236,7 +236,7 @@ export default function ServerDossierScreen() {
                         paddingVertical: 8,
                         borderRadius: 8,
                         borderLeftWidth: 3,
-                        borderLeftColor: m.deleted ? "#5E7E82" : "#37D6C0",
+                        borderLeftColor: m.deleted ? "#7F9DA1" : "#37D6C0",
                         backgroundColor: "rgba(255,255,255,0.04)",
                       }}
                     >
@@ -249,7 +249,7 @@ export default function ServerDossierScreen() {
                         </Text>
                       </Pressable>
                       <Text
-                        style={{ color: m.deleted ? "#5E7E82" : "#E6F3F3", fontSize: 13, marginTop: 3, fontStyle: m.deleted ? "italic" : "normal" }}
+                        style={{ color: m.deleted ? "#7F9DA1" : "#E6F3F3", fontSize: 13, marginTop: 3, fontStyle: m.deleted ? "italic" : "normal" }}
                         numberOfLines={4}
                       >
                         {m.deleted ? "Mensaje eliminado" : m.content}
